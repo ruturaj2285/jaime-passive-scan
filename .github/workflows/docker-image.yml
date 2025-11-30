@@ -10,9 +10,10 @@ on:
 
 env:
   AWS_REGION: ap-northeast-1
-  ECR_REPO: passive-poc-2285
+  ECR_REPOSITORY: passive-poc-2285
   MANIFEST_PATH: manifests/deployment.yaml
   APP_URL: https://your-loadbalancer-url   # Replace after first deploy
+  IMAGE_TAG: ${{ github.run_number }}
 
 jobs:
   build_deploy_scan:
@@ -40,21 +41,20 @@ jobs:
       - name: Login to ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      # -------------------------
-      # 4. Build & Push Image
-      # -------------------------
-      - name: Build & Push Docker Image
-        id: buildpush
+      - name: Build Docker image
         run: |
-          cd app/
-          IMAGE_TAG=${{ github.run_number }}
-          ECR="${{ steps.login-ecr.outputs.registry }}${ECR_REPO}:${IMAGE_TAG}"
+          docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
 
-          docker build -t $ECR_REPO:$IMAGE_TAG .
-          docker tag $ECR_REPO:$IMAGE_TAG $ECR
-          docker push $ECR
+      - name: Tag image
+        run: |
+          ECR_REGISTRY=${{ steps.login-ecr.outputs.registry }}
+          docker tag $ECR_REPOSITORY:$IMAGE_TAG \
+            $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-          echo "IMAGE=$ECR" >> $GITHUB_ENV
+      - name: Push image
+        run: |
+          ECR_REGISTRY=${{ steps.login-ecr.outputs.registry }}
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
       # -------------------------
       # 5. Update Kustomize/Manifest
