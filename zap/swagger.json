@@ -7,7 +7,7 @@
   },
   "servers": [
     {
-      "url": "http://my-node-app.jaime-poc-2285.svc.cluster.local:80",
+      "url": "http://a47554de162314a199d314075ce3453c-1683098165.ap-northeast-1.elb.amazonaws.com",
       "description": "Kubernetes Cluster Service URL"
     }
   ],
@@ -183,4 +183,4 @@
       }
     }
   }
-}
+
