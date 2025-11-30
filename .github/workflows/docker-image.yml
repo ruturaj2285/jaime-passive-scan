@@ -1,0 +1,103 @@
+name: CI-CD with ZAP Passive Scan
+
+on:
+  push:
+    branches: ["main"]
+
+env:
+  AWS_REGION: ap-northeast-1
+  ECR_REPO: passive-poc-2285
+  MANIFEST_PATH: manifests/deployment.yaml
+  APP_URL: https://your-loadbalancer-url   # Replace after first deploy
+
+jobs:
+  build_deploy_scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      # -------------------------
+      # 1. Checkout code
+      # -------------------------
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # -------------------------
+      # 2. Configure AWS
+      # -------------------------
+      - name: AWS Login
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::227295996532:role/zap-passive-role
+
+      # -------------------------
+      # 3. Login to ECR
+      # -------------------------
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # -------------------------
+      # 4. Build & Push Image
+      # -------------------------
+      - name: Build & Push Docker Image
+        id: buildpush
+        run: |
+          cd app/
+          IMAGE_TAG=${{ github.run_number }}
+          ECR="${{ steps.login-ecr.outputs.registry }}/${ECR_REPO}:${IMAGE_TAG}"
+
+          docker build -t $ECR_REPO:$IMAGE_TAG .
+          docker tag $ECR_REPO:$IMAGE_TAG $ECR
+          docker push $ECR
+
+          echo "IMAGE=$ECR" >> $GITHUB_ENV
+
+      # -------------------------
+      # 5. Update Kustomize/Manifest
+      # -------------------------
+      - name: Update Deployment YAML
+        run: |
+          sed -i "s|image: .*|image: ${IMAGE}|g" $MANIFEST_PATH
+
+      # -------------------------
+      # 6. Commit Updated Manifest (GitOps)
+      # -------------------------
+      - name: Commit Deployment Manifest
+        run: |
+          git config --global user.email "ci@github.com"
+          git config --global user.name "GitHub Actions"
+          git add $MANIFEST_PATH
+          git commit -m "Update image to ${IMAGE}" || echo "No changes"
+          git push origin main
+
+      # -------------------------
+      # 7. Wait for ArgoCD to Deploy
+      # -------------------------
+      - name: Wait for deployment
+        run: |
+          echo "Waiting 120 seconds for ArgoCD deployment..."
+          sleep 120
+
+      # -------------------------
+      # 8. Run OWASP ZAP Passive Scan (Runner)
+      # -------------------------
+      - name: Run ZAP Passive Scan
+        run: |
+          docker pull owasp/zap2docker-stable
+
+          docker run --rm \
+            -v $(pwd):/zap/wrk \
+            owasp/zap2docker-stable \
+            zap-baseline.py \
+              -t $APP_URL \
+              -r zap_report.html \
+              -I
+
+      # -------------------------
+      # 9. Upload ZAP report
+      # -------------------------
+      - name: Upload ZAP Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-passive-report
+          path: zap_report.html
