@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: node-poc-passive
-          image: REPLACE_ME   # GitHub Action will replace this
+          image: 227295996532.dkr.ecr.ap-northeast-1.amazonaws.com/passive-poc-2285:7  # GitHub Action will replace this
           ports:
             - containerPort: 3001
 
