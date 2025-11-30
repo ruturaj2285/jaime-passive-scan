@@ -89,15 +89,14 @@ jobs:
       # ---------------------------------------------------
       - name: Run ZAP Passive Scan
         run: |
-          docker pull owasp/zap2docker-stable
+          docker run --rm -t \
+          -v $(pwd):/zap/wrk \
+          ghcr.io/zaproxy/zaproxy:stable \
+          zap-baseline.py \
+          -t http://a47554de162314a199d314075ce3453c-1683098165.ap-northeast-1.elb.amazonaws.com/ \
+          -r zap_report.html \
+          -I
 
-          docker run --rm \
-            -v $(pwd):/zap/wrk \
-            owasp/zap2docker-stable \
-            zap-baseline.py \
-              -t "$APP_URL" \
-              -r zap_report.html \
-              -I
 
       # ---------------------------------------------------
       # 9. Upload ZAP Security Report
