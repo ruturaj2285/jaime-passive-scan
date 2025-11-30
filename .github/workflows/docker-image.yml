@@ -95,8 +95,10 @@ jobs:
           zap-baseline.py \
           -t http://a47554de162314a199d314075ce3453c-1683098165.ap-northeast-1.elb.amazonaws.com/ \
           -r zap_report.html \
+          -z "openapi.enable=true" \
+          -z "openapi.file=/zap/swagger.json" \
           -I
-
+                                                                                  
 
       # ---------------------------------------------------
       # 9. Upload ZAP Security Report
