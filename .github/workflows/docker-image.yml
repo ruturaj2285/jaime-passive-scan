@@ -20,27 +20,31 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # -------------------------
-      # 1. Checkout code
-      # -------------------------
+      # ---------------------------------------------------
+      # 1. Checkout Code
+      # ---------------------------------------------------
       - name: Checkout
         uses: actions/checkout@v4
 
-      # -------------------------
-      # 2. Configure AWS
-      # -------------------------
+      # ---------------------------------------------------
+      # 2. AWS OIDC Login
+      # ---------------------------------------------------
       - name: AWS Login
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: ${{ env.AWS_REGION }}
           role-to-assume: arn:aws:iam::227295996532:role/zap-passive-role
 
-      # -------------------------
+      # ---------------------------------------------------
       # 3. Login to ECR
-      # -------------------------
+      # ---------------------------------------------------
       - name: Login to ECR
+        id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      # ---------------------------------------------------
+      # 4. Build, Tag & Push Docker image to ECR
+      # ---------------------------------------------------
       - name: Build Docker image
         run: |
           docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
@@ -48,43 +52,44 @@ jobs:
       - name: Tag image
         run: |
           ECR_REGISTRY=${{ steps.login-ecr.outputs.registry }}
-          docker tag $ECR_REPOSITORY:$IMAGE_TAG \
-            $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
+          docker tag $ECR_REPOSITORY:$IMAGE_TAG $IMAGE_URI
 
       - name: Push image
         run: |
-          ECR_REGISTRY=${{ steps.login-ecr.outputs.registry }}
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $IMAGE_URI
 
-      # -------------------------
-      # 5. Update Kustomize/Manifest
-      # -------------------------
+      # ---------------------------------------------------
+      # 5. Update Deployment YAML (Kustomize / Manifest)
+      # ---------------------------------------------------
       - name: Update Deployment YAML
         run: |
-          sed -i "s|image: .*|image: ${IMAGE}|g" $MANIFEST_PATH
+          sed -i "s|image: .*|image: $IMAGE_URI|g" $MANIFEST_PATH
 
-      # -------------------------
-      # 6. Commit Updated Manifest (GitOps)
-      # -------------------------
+      # ---------------------------------------------------
+      # 6. Commit YAML for ArgoCD GitOps
+      # ---------------------------------------------------
       - name: Commit Deployment Manifest
         run: |
           git config --global user.email "ci@github.com"
           git config --global user.name "GitHub Actions"
+
           git add $MANIFEST_PATH
-          git commit -m "Update image to ${IMAGE}" || echo "No changes"
+          git commit -m "Update image to $IMAGE_URI" || echo "No changes to commit"
           git push origin main
 
-      # -------------------------
-      # 7. Wait for ArgoCD to Deploy
-      # -------------------------
-      - name: Wait for deployment
+      # ---------------------------------------------------
+      # 7. Wait for ArgoCD to Deploy to EKS
+      # ---------------------------------------------------
+      - name: Wait for ArgoCD Deployment
         run: |
           echo "Waiting 120 seconds for ArgoCD deployment..."
           sleep 120
 
-      # -------------------------
-      # 8. Run OWASP ZAP Passive Scan (Runner)
-      # -------------------------
+      # ---------------------------------------------------
+      # 8. Run OWASP ZAP Passive Scan
+      # ---------------------------------------------------
       - name: Run ZAP Passive Scan
         run: |
           docker pull owasp/zap2docker-stable
@@ -93,13 +98,13 @@ jobs:
             -v $(pwd):/zap/wrk \
             owasp/zap2docker-stable \
             zap-baseline.py \
-              -t $APP_URL \
+              -t "$APP_URL" \
               -r zap_report.html \
               -I
 
-      # -------------------------
-      # 9. Upload ZAP report
-      # -------------------------
+      # ---------------------------------------------------
+      # 9. Upload ZAP Security Report
+      # ---------------------------------------------------
       - name: Upload ZAP Report
         uses: actions/upload-artifact@v4
         with:
