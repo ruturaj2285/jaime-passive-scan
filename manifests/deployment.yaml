@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: node-poc-deployment
+  labels:
+    app: node-poc-passive
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: node-poc-passive 
+  template:
+    metadata:
+      labels:
+        app: node-poc-passive
+    spec:
+      containers:
+        - name: node-poc-passive
+          image: REPLACE_ME   # GitHub Action will replace this
+          ports:
+            - containerPort: 3001
+

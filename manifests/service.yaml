@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: node-poc-service
+spec:
+  selector:
+    app: node-poc-passive
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 3001
+  type: LoadBalancer
+
