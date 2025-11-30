@@ -90,7 +90,7 @@ jobs:
       - name: Run ZAP Passive Scan
         run: |
           docker run --rm -t \
-          -v $(pwd):/zap/wrk \
+          -v $(pwd)/zap:/zap/wrk \
           ghcr.io/zaproxy/zaproxy:stable \
           zap-baseline.py \
           -t http://a47554de162314a199d314075ce3453c-1683098165.ap-northeast-1.elb.amazonaws.com/ \
