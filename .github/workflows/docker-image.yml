@@ -1,5 +1,9 @@
 name: CI-CD with ZAP Passive Scan
 
+permissions:
+  id-token: write
+  contents: read
+
 on:
   push:
     branches: ["main"]
