@@ -1,0 +1,108 @@
+name: CI-CD with ZAP Passive Scan
+
+permissions:
+  id-token: write
+  contents: read
+
+on:
+  push:
+    branches: ["main"]
+
+env:
+  AWS_REGION: ap-northeast-1
+  ECR_REPOSITORY: passive-poc-2285
+  MANIFEST_PATH: manifests/deployment.yaml
+  APP_URL: http://a47554de162314a199d314075ce3453c-1683098165.ap-northeast-1.elb.amazonaws.com  # Replace after first deploy
+  IMAGE_TAG: ${{ github.run_number }}
+
+jobs:
+  build_deploy_scan:
+    runs-on: self-hosted
+
+    steps:
+      # ---------------------------------------------------
+      # 1. Checkout Code
+      # ---------------------------------------------------
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ---------------------------------------------------
+      # 2. AWS OIDC Login
+      # ---------------------------------------------------
+      - name: AWS Login
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::227295996532:role/zap-passive-role
+
+      # ---------------------------------------------------
+      # 3. Login to ECR
+      # ---------------------------------------------------
+      - name: Login to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # ---------------------------------------------------
+      # 4. Build, Tag & Push Docker image to ECR
+      # ---------------------------------------------------
+      - name: Build Docker image
+        run: |
+          cd app/
+          docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
+
+      - name: Tag image
+        run: |
+          ECR_REGISTRY=${{ steps.login-ecr.outputs.registry }}
+          IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
+          docker tag $ECR_REPOSITORY:$IMAGE_TAG $IMAGE_URI
+
+      - name: Push image
+        run: |
+          docker push $IMAGE_URI
+
+      # ---------------------------------------------------
+      # 5. Update Deployment YAML (Kustomize / Manifest)
+      # ---------------------------------------------------
+      - name: Update Deployment YAML
+        run: |
+          sed -i "s|image: .*|image: $IMAGE_URI|g" $MANIFEST_PATH
+
+
+
+      # ---------------------------------------------------
+      # 7. Wait for ArgoCD to Deploy to EKS
+      # ---------------------------------------------------
+      - name: Wait for ArgoCD Deployment
+        run: |
+          echo "Waiting 10 seconds for ArgoCD deployment..."
+          sleep 10
+
+
+      - name: Test reachability
+        run: |
+          curl -I http://a47554de162314a199d314075ce3453c-1683098165.ap-northeast-1.elb.amazonaws.com/
+          
+
+      # ---------------------------------------------------
+      # 8. Run OWASP ZAP Passive Scan
+      # ---------------------------------------------------
+      - name: Run ZAP Passive Scan
+        run: |
+          docker run --rm -t \
+          -v $(pwd):/zap/wrk \
+          ghcr.io/zaproxy/zaproxy:stable \
+          zap-baseline.py \
+          -t http://a47554de162314a199d314075ce3453c-1683098165.ap-northeast-1.elb.amazonaws.com/ \
+          -r zap_report.html \
+          -I
+
+
+      # ---------------------------------------------------
+      # 9. Upload ZAP Security Report
+      # ---------------------------------------------------
+      - name: Upload ZAP Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-passive-report
+          path: zap_report.html
