@@ -68,17 +68,7 @@ jobs:
         run: |
           sed -i "s|image: .*|image: $IMAGE_URI|g" $MANIFEST_PATH
 
-      # ---------------------------------------------------
-      # 6. Commit YAML for ArgoCD GitOps
-      # ---------------------------------------------------
-      - name: Commit Deployment Manifest
-        run: |
-          git config --global user.email "ci@github.com"
-          git config --global user.name "GitHub Actions"
 
-          git add $MANIFEST_PATH
-          git commit -m "Update image to $IMAGE_URI" || echo "No changes to commit"
-          git push origin main
 
       # ---------------------------------------------------
       # 7. Wait for ArgoCD to Deploy to EKS
