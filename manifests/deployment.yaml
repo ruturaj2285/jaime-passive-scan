@@ -5,7 +5,7 @@ metadata:
   labels:
     app: node-poc-passive
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: node-poc-passive 
