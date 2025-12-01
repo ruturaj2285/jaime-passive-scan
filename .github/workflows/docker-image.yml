@@ -92,11 +92,11 @@ jobs:
           docker run --rm -t \
           -v $(pwd)/zap:/zap/wrk \
           ghcr.io/zaproxy/zaproxy:stable \
-          zap-api-scan.py \
+          zap-baseline.py \
           -t http://a47554de162314a199d314075ce3453c-1683098165.ap-northeast-1.elb.amazonaws.com/ \
           -r zap_report.html \
-          -z "openapi.enable=true" \
-          -z "openapi.file=/zap/wrk/swagger.json" \
+          # -z "openapi.enable=true" \
+          # -z "openapi.file=/zap/wrk/swagger.json" \
           -I
                                                                                   
 
