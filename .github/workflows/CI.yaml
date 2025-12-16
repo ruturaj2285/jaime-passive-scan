@@ -1,0 +1,92 @@
+name: CI main
+
+permissions:
+  id-token: write
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Enable dry-run mode"
+        type: boolean
+        required: false
+        default: false
+      environment:
+        description: "Environment for dry-run"
+        type: choice
+        required: false
+        options:
+          - development
+          - staging
+          - productio
+
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+    branches:
+      - "develop/*"
+      - "release/*"
+    paths-ignore:
+      - .azure-pipelines/**
+      - .github/**
+      - README.md
+  pull_request:
+    branches:
+      - "develop/*"
+      - "release/*"
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+    paths-ignore:
+      - .azure-pipelines/**
+      - .github/**
+      - README.md
+
+env:
+  PAT_SECRET_ID: arn:aws:secretsmanager:ap-northeast-1:149653749155:secret:PIPELINE-M4vrAD
+  PAT_SECRET_NAMES: "AZDO-PAT,GITHUB-PAT"
+  IS_DEV: ${{ (inputs.dry-run && inputs.environment == 'development') ||(!inputs.dry-run && ((github.event_name == 'pull_request' && startsWith(github.base_ref, 'develop')) ||(github.event_name == 'push' && github.ref_type == 'branch' && startsWith(github.ref_name, 'develop')))) }}
+  IS_STAGING: ${{ (inputs.dry-run && inputs.environment == 'staging') || (!inputs.dry-run && ((github.event_name == 'pull_request' && startsWith(github.base_ref, 'release')) || (github.event_name == 'push' && github.ref_type == 'branch' && startsWith(github.ref_name, 'release')))) }}
+  IS_PROD: ${{ (inputs.dry-run && inputs.environment == 'production') || (!inputs.dry-run && ((github.event_name == 'pull_request' && github.base_ref == 'main') || (github.ref_type == 'tag' && !contains(github.ref_name, '-rc') && !contains(github.ref_name, '-qa')))) }}
+  envFile: ./.env
+
+jobs:
+  get-environment:
+    name: Get Environment
+    runs-on: ["cloud", "infra"]
+    outputs:
+      result: ${{ steps.set-environment.outputs.result }}
+
+    steps:
+      - name: Set Environment Configuration
+        id: set-environment
+        run: |
+          obj=$(echo '{}' | jq -r '
+            if env.IS_DEV == "true" then {
+              result: "development"
+            } elif env.IS_STAGING == "true" then {
+              result: "staging"
+            } elif env.IS_PROD == "true" then {
+              result: "production"
+            } else {}
+            end
+          ')
+
+          if [ "$obj" == "{}" ]; then
+            echo "::error::Environment is not selected."
+            exit 1
+          fi
+
+          echo "result=$(echo "$obj" | jq -r '.result')" >> $GITHUB_OUTPUT
+          echo "::group::GITHUB_OUTPUT:"
+          cat $GITHUB_OUTPUT
+          echo "::endgroup::"
+      
+      - name: Debug GitHub context
+        run: |
+           echo "event_name: ${{ github.event_name }}"
+           echo "event_action: ${{ github.event.action }}"
+           
