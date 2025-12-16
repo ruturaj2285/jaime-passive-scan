@@ -51,6 +51,7 @@ jobs:
       - name: Test reachability
         run: |
           curl -I $TARGET_URL
+          echo "completed"
 
       - name: Run ZAP Baseline Scan (Passive)
         continue-on-error: false   
