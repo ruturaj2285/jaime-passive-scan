@@ -1,0 +1,84 @@
+name: OWASP ZAP Weekly Scan
+
+permissions:
+  id-token: write
+  contents: read
+
+on:
+  schedule:
+    - cron: "0 2 * * 1"   
+  
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        type: choice
+        required: true
+        options:
+          - development
+          - staging
+
+env:
+  ZAP_IMAGE: ghcr.io/zaproxy/zaproxy:stable
+  REPORT_DIR: zap-report
+
+jobs:
+  zap-baseline-scan:
+    name: OWASP ZAP Baseline Scan
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set scan configuration
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            ENVIRONMENT=staging
+          else
+            ENVIRONMENT="${{ inputs.environment }}"
+          fi
+          echo "ENVIRONMENT=$ENVIRONMENT" >> "$GITHUB_ENV"
+          if [ "$ENVIRONMENT" = "staging" ]; then
+            echo "TARGET_URL=${{ vars.STG_TARGET_URL }}" >> "$GITHUB_ENV"
+          else
+            echo "TARGET_URL=${{ vars.DEV_TARGET_URL }}" >> "$GITHUB_ENV"
+          fi
+
+          # echo "S3_BUCKET=security-zap-reports-${{ github.repository_owner }}" >> $GITHUB_ENV
+          # echo "S3_PREFIX=${{ github.repository }}/$ENVIRONMENT/$(date +%Y-%m-%d)" >> $GITHUB_ENV
+
+      - name: Test reachability
+        run: |
+          curl -I $TARGET_URL
+
+      - name: Run ZAP Baseline Scan (Passive)
+        continue-on-error: false   
+        run: |
+          mkdir -p $REPORT_DIR
+
+          docker run --rm -t \
+          -v $(pwd)/$REPORT_DIR:/zap/wrk \
+          "$ZAP_IMAGE" \
+          zap-baseline.py \
+          -t $TARGET_URL \
+          -r zap_report.html \
+          -I -W
+
+      # - name: Configure AWS credentials
+      #   uses: aws-actions/configure-aws-credentials@v3
+      #   with:
+      #     role-to-assume: ${{ vars.CI_AWS_ASSUME_ROLE }}
+      #     aws-region: ${{ vars.CI_AWS_REGION }}
+
+    
+      # - name: Upload reports to aws S3
+      #   run: |
+      #     aws s3 cp $REPORT_DIR s3://$S3_BUCKET/$S3_PREFIX/ --recursive
+
+      - name: Upload reports as GitHub artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-report-${{ env.ENVIRONMENT }}
+          path: ${{ env.REPORT_DIR }}
+
