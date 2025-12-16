@@ -25,7 +25,7 @@ env:
 jobs:
   zap-baseline-scan:
     name: OWASP ZAP Baseline Scan
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
