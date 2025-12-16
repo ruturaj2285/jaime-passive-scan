@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: "Target environment for dev"
+        description: "Target environment for devand stage"
         type: choice
         required: true
         options:
