@@ -2,7 +2,7 @@ name: Cron Demo - Every 1 Minute
 
 on:
   schedule:
-    - cron: "* * * * *"
+    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 jobs:
