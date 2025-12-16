@@ -82,4 +82,3 @@ jobs:
         with:
           name: zap-report-${{ env.ENVIRONMENT }}
           path: ${{ env.REPORT_DIR }}
-
