@@ -12,7 +12,7 @@ env:
   AWS_REGION: ap-northeast-1
   ECR_REPOSITORY: passive-poc-2285
   MANIFEST_PATH: manifests/deployment.yaml
-  APP_URL: http://a47554de162314a199d314075ce3453c-1683098165.ap-northeast-1.elb.amazonaws.com  # Replace after first deploy
+  APP_URL: http://a37a55d248dce41c59b78f1f436e69bd-2141846859.ap-northeast-1.elb.amazonaws.com/  # Replace after first deploy
   IMAGE_TAG: ${{ github.run_number }}
 
 jobs:
