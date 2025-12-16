@@ -1,0 +1,32 @@
+name: CI
+
+permissions:
+  id-token: write
+  contents: read
+
+on:
+  schedule:
+    - cron: "0 15 * * 6"   
+  
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        type: choice
+        required: true
+        options:
+          - development
+          - staging
+
+env:
+  ZAP_IMAGE: ghcr.io/zaproxy/zaproxy:stable
+  REPORT_DIR: zap-report
+
+jobs:
+  zap-baseline-scan:
+    name: OWASP ZAP Baseline Scan
+    runs-on: ["cloud", "infra"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
